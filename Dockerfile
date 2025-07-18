@@ -5,8 +5,8 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Step 3: Install system dependencies required for your application
-# This is where we install Tesseract for OCR
-RUN apt-get update && apt-get install -y tesseract-ocr --no-install-recommends
+# This is where we install Tesseract AND the missing graphics library for OpenCV
+RUN apt-get update && apt-get install -y tesseract-ocr libgl1-mesa-glx --no-install-recommends
 
 # Step 4: Copy the Python requirements file into the container
 COPY requirements.txt .
