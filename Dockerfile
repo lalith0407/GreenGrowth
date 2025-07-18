@@ -1,5 +1,5 @@
 # [cite_start]Use a Python slim base image for smaller size [cite: 1]
-FROM python:3.9-slim-buster
+FROM python:3.9-slim-bullseye
 
 # [cite_start]Install system dependencies (tesseract-ocr and poppler-utils for pdf2image) [cite: 1]
 # Ensure apt-get update is run before installs
