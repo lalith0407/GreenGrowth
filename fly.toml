@@ -3,19 +3,14 @@ kill_signal = "SIGINT"
 kill_timeout = 5
 
 [build]
-  # This section tells Fly.io to use a Dockerfile in your project root.
-  # If you have a Dockerfile named 'Dockerfile' in your project root,
-  # this section is often not strictly necessary as Fly.io will auto-detect it.
-  builder = "paketobuildpacks/builder:base" # This is a common builder, but not specific to your app's needs if you have a Dockerfile.
-  # If you use a custom Dockerfile, you usually don't need 'builder' here.
-  # Just having a Dockerfile in your project root is enough.
+  # ...your build settings...
 
 [env]
   # ...your env vars...
 
 [processes]
-  # Removed 'worker' process as it's not tied to a service and not used by the main app logic
   web = "uvicorn main:app --host 0.0.0.0 --port 10000"
+  # Removed the 'worker' process definition here as it's not being used.
 
 [experimental]
   autostop = false      # disable idle shutdown globally
