@@ -155,7 +155,7 @@ async def process_tax_forms(
         '34 - Amount you overpaid': tax_summary['refund'],
         '37 - Amount you owe': tax_summary['tax_due'],
     }
-    input_pdf_template = "fillable-1040.pdf" 
+    input_pdf_template = "f1040.pdf" 
     filled_pdf_bytes = fill_1040_pdf(input_pdf_template, pdf_data_to_fill)
     
     if filled_pdf_bytes:
