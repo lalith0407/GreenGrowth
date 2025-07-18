@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+python-multipart
+python-dotenv
+openai
+unstructured[pdf]
+pdf2image
+PyMuPDF
+pytesseract
+pypdf
+fastapi-cors
