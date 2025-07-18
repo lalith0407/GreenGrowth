@@ -128,6 +128,7 @@ async def process_tax_forms(
         blocking_file_processor,
         files=files,
         openai_api_key=openai_api_key
+        # Removed tesseract_path argument here
     )
 
     try:

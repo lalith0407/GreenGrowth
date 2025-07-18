@@ -8,6 +8,7 @@ import openai
 import json
 import warnings
 import traceback
+import tempfile # Added import
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -19,8 +20,11 @@ class TaxFormParser:
     def __init__(self, openai_api_key: str):
         """
         Initializes the parser and sets up the OpenAI client.
-        Tesseract is expected to be in the system's PATH on Render.
+        Configures Tesseract path for Linux environments.
         """
+        # Explicitly set Tesseract command for Linux/Docker environment
+        pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract" # This is where apt-get installs it
+        
         self.client = self._initialize_openai_client(openai_api_key)
         self.form_field_defs = self._get_form_field_definitions()
 
@@ -68,7 +72,8 @@ class TaxFormParser:
     def _parse_text_from_page(self, file_path: str, page_number: int) -> str:
         """Parses a single page of a PDF using Tesseract OCR."""
         try:
-            images = convert_from_path(file_path, first_page=page_number, last_page=page_number)
+            # --- IMPORTANT CHANGE: Reduce DPI for memory efficiency ---
+            images = convert_from_path(file_path, first_page=page_number, last_page=page_number, dpi=150) # Reduce DPI
             if not images: return ""
             return pytesseract.image_to_string(images[0])
         except Exception as e:
@@ -86,7 +91,8 @@ class TaxFormParser:
         try:
             with fitz.open(file_path) as doc:
                 for page_num in range(1, len(doc) + 1):
-                    text = self._parse_text_from_page(file_path, page_num)
+                    # Use a lower DPI for initial text extraction to save memory
+                    text = self._parse_text_from_page(file_path, page_num) 
                     if not text: continue
                     for dt, header_pat in header_patterns.items():
                         if re.search(header_pat, text, re.IGNORECASE): return dt
@@ -109,7 +115,8 @@ class TaxFormParser:
         try:
             with fitz.open(file_path) as doc:
                 for i in range(1, len(doc) + 1):
-                    text = self._parse_text_from_page(file_path, i)
+                    # Use a lower DPI for initial text extraction to save memory
+                    text = self._parse_text_from_page(file_path, i) 
                     if not text: continue
                     score = sum(bool(re.search(cue, text, re.IGNORECASE)) for cue in cues)
                     if score > max_score:
@@ -124,9 +131,15 @@ class TaxFormParser:
 
     def _process_file_with_unstructured(self, file_path: str) -> str:
         try:
+            # unstructured's hi_res strategy can be memory intensive.
+            # Keep it if accuracy is paramount, otherwise consider other strategies
+            # or pre-process images at a lower DPI if unstructured supports it.
             elements = partition_pdf(filename=file_path, strategy="hi_res", infer_table_structure=True)
             return "\n\n".join([el.text or "" for el in elements])
-        except Exception: return ""
+        except Exception as e:
+            print(f"ERROR: Unstructured PDF processing failed: {e}")
+            traceback.print_exc()
+            return ""
 
     def _extract_data_with_openai(self, context: str, doc_type: str) -> dict:
         defs = self.form_field_defs.get(doc_type)
@@ -142,7 +155,10 @@ class TaxFormParser:
                 messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
             )
             return json.loads(resp.choices[0].message.content)
-        except Exception: return {}
+        except Exception as e:
+            print(f"ERROR: OpenAI data extraction failed: {e}")
+            traceback.print_exc()
+            return {}
 
     def process_pdf(self, file_path: str) -> tuple:
         if not self.client or not os.path.exists(file_path): return {}, "Error"
@@ -150,12 +166,20 @@ class TaxFormParser:
         if not doc_type: return {}, "Unknown"
         page = self._find_page_with_cues(file_path, doc_type)
         if not page: return {}, doc_type
-        temp_pdf = "_temp_page.pdf"
+        
+        temp_pdf = os.path.join(tempfile.gettempdir(), "_temp_page.pdf") # Use standard temp dir
         try:
             self._create_temp_pdf(file_path, page, temp_pdf)
             context = self._process_file_with_unstructured(temp_pdf)
             if not context: return {}, doc_type
             return self._extract_data_with_openai(context, doc_type), doc_type
-        except Exception: return {}, doc_type
+        except Exception as e:
+            print(f"ERROR: General PDF processing failed for {file_path}: {e}")
+            traceback.print_exc()
+            return {}, "Error" # Return "Error" type for clarity on failure
         finally:
-            if os.path.exists(temp_pdf): os.remove(temp_pdf)
+            if os.path.exists(temp_pdf):
+                try:
+                    os.remove(temp_pdf)
+                except OSError as e:
+                    print(f"WARNING: Could not remove temporary file {temp_pdf}: {e}")

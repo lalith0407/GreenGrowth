@@ -1,26 +1,30 @@
-# Step 1: Use an official Python runtime as a parent image
-FROM python:3.11-slim
+# [cite_start]Use a Python slim base image for smaller size [cite: 1]
+FROM python:3.9-slim-buster
 
-# Step 2: Set the working directory inside the container
+# [cite_start]Install system dependencies (tesseract-ocr and poppler-utils for pdf2image) [cite: 1]
+# Ensure apt-get update is run before installs
+RUN apt-get update && apt-get install -y \
+    tesseract-ocr \
+    libtesseract-dev \
+    libleptonica-dev \
+    poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# [cite_start]Set the TESSERACT_CMD environment variable for pytesseract [cite: 1]
+ENV TESSERACT_CMD /usr/bin/tesseract
+
+# Set the working directory
 WORKDIR /app
 
-# Step 3: Install system dependencies required for your application
-# This now includes Tesseract, the graphics library, AND poppler for pdf2image.
-RUN apt-get update && apt-get install -y tesseract-ocr libgl1-mesa-glx poppler-utils --no-install-recommends
-
-# Step 4: Copy the Python requirements file into the container
+# Copy requirements.txt and install Python dependencies
 COPY requirements.txt .
-
-# Step 5: Install the Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Step 6: Copy the rest of your application's code into the container
-# This includes main.py, silent.py, pdffilling.py, and fillable-1040.pdf
+# Copy the rest of your application code, including f1040.pdf
 COPY . .
 
-# Step 7: Expose the port your app will run on
+# Expose the port your FastAPI app will listen on (matches fly.toml)
 EXPOSE 10000
 
-# Step 8: Define the command to run your application
-# This is what Render will execute when the container starts
+# Command to run your FastAPI application using uvicorn
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "10000"]
