@@ -1,16 +1,17 @@
-# [cite_start]Use a Python slim base image for smaller size [cite: 1]
-FROM python:3.9-slim-bullseye
+# Use a Python slim base image for smaller size
+FROM python:3.9-slim-bullseye # Or bookworm
 
-# [cite_start]Install system dependencies (tesseract-ocr and poppler-utils for pdf2image) [cite: 1]
+# Install system dependencies (tesseract-ocr, poppler-utils, and libgl1-mesa-glx)
 # Ensure apt-get update is run before installs
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     libtesseract-dev \
     libleptonica-dev \
     poppler-utils \
+    libgl1-mesa-glx \ # <--- ADD THIS LINE
     && rm -rf /var/lib/apt/lists/*
 
-# [cite_start]Set the TESSERACT_CMD environment variable for pytesseract [cite: 1]
+# Set the TESSERACT_CMD environment variable for pytesseract
 ENV TESSERACT_CMD /usr/bin/tesseract
 
 # Set the working directory
@@ -20,7 +21,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of your application code, including f1040.pdf
+# Copy the rest of your application code
 COPY . .
 
 # Expose the port your FastAPI app will listen on (matches fly.toml)
