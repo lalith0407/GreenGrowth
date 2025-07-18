@@ -1,14 +1,15 @@
 import os
 import re
 import fitz  # PyMuPDF
-from pdf2image import convert_from_path
+from pdf22image import convert_from_path
 import pytesseract
 from unstructured.partition.pdf import partition_pdf
 import openai
 import json
 import warnings
 import traceback
-import tempfile # Added import
+import tempfile
+from typing import Union, Dict, Any # Added Union and other types for clarity
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -23,7 +24,7 @@ class TaxFormParser:
         Configures Tesseract path for Linux environments.
         """
         # Explicitly set Tesseract command for Linux/Docker environment
-        pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract" # This is where apt-get installs it
+        pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
         
         self.client = self._initialize_openai_client(openai_api_key)
         self.form_field_defs = self._get_form_field_definitions()
@@ -39,7 +40,7 @@ class TaxFormParser:
             print(f"ERROR: Failed to initialize OpenAI client: {e}")
             return None
 
-    def _get_form_field_definitions(self) -> dict:
+    def _get_form_field_definitions(self) -> Dict[str, Any]: # Changed type hint
         """Returns the dictionary of field definitions for supported tax forms."""
         return {
             "W-2": {
@@ -72,7 +73,6 @@ class TaxFormParser:
     def _parse_text_from_page(self, file_path: str, page_number: int) -> str:
         """Parses a single page of a PDF using Tesseract OCR."""
         try:
-            # --- IMPORTANT CHANGE: Reduce DPI for memory efficiency ---
             images = convert_from_path(file_path, first_page=page_number, last_page=page_number, dpi=150) # Reduce DPI
             if not images: return ""
             return pytesseract.image_to_string(images[0])
@@ -80,7 +80,7 @@ class TaxFormParser:
             print(f"ERROR: Tesseract OCR failed for page {page_number} of {file_path}. Error: {e}")
             return ""
 
-    def _identify_document_type(self, file_path: str) -> str | None:
+    def _identify_document_type(self, file_path: str) -> Union[str, None]: # Changed type hint
         doc_type_patterns = {
             "W-2": [r"Form\s*W-2", r"Wage\s+and\s+Tax\s+Statement", r"Wages,\s+tips,\s+other\s+compensation"],
             "1099-INT": [r"Form\s*1099-INT", r"Interest\s+Income", r"Early\s+withdrawal\s+penalty"],
@@ -91,8 +91,7 @@ class TaxFormParser:
         try:
             with fitz.open(file_path) as doc:
                 for page_num in range(1, len(doc) + 1):
-                    # Use a lower DPI for initial text extraction to save memory
-                    text = self._parse_text_from_page(file_path, page_num) 
+                    text = self._parse_text_from_page(file_path, page_num)
                     if not text: continue
                     for dt, header_pat in header_patterns.items():
                         if re.search(header_pat, text, re.IGNORECASE): return dt
@@ -103,7 +102,7 @@ class TaxFormParser:
         best = max(scores, key=scores.get)
         return best if scores[best] > 0 else None
 
-    def _find_page_with_cues(self, file_path: str, doc_type: str) -> int | None:
+    def _find_page_with_cues(self, file_path: str, doc_type: str) -> Union[int, None]: # Changed type hint
         cue_definitions = {
             "W-2": ["Wages, tips, other compensation", "Federal income tax withheld", "Wage and Tax Statement"],
             "1099-INT": ["Interest Income", "Payer's TIN", "Early withdrawal penalty"],
@@ -115,8 +114,7 @@ class TaxFormParser:
         try:
             with fitz.open(file_path) as doc:
                 for i in range(1, len(doc) + 1):
-                    # Use a lower DPI for initial text extraction to save memory
-                    text = self._parse_text_from_page(file_path, i) 
+                    text = self._parse_text_from_page(file_path, i)
                     if not text: continue
                     score = sum(bool(re.search(cue, text, re.IGNORECASE)) for cue in cues)
                     if score > max_score:
@@ -131,9 +129,7 @@ class TaxFormParser:
 
     def _process_file_with_unstructured(self, file_path: str) -> str:
         try:
-            # unstructured's hi_res strategy can be memory intensive.
-            # Keep it if accuracy is paramount, otherwise consider other strategies
-            # or pre-process images at a lower DPI if unstructured supports it.
+            # Using 'hi_res' strategy; consider 'fast' if memory is still an issue
             elements = partition_pdf(filename=file_path, strategy="hi_res", infer_table_structure=True)
             return "\n\n".join([el.text or "" for el in elements])
         except Exception as e:
@@ -141,7 +137,7 @@ class TaxFormParser:
             traceback.print_exc()
             return ""
 
-    def _extract_data_with_openai(self, context: str, doc_type: str) -> dict:
+    def _extract_data_with_openai(self, context: str, doc_type: str) -> Dict[str, Any]: # Changed type hint
         defs = self.form_field_defs.get(doc_type)
         if not defs or not self.client: return {}
         fields = list(defs.keys())
@@ -160,14 +156,14 @@ class TaxFormParser:
             traceback.print_exc()
             return {}
 
-    def process_pdf(self, file_path: str) -> tuple:
+    def process_pdf(self, file_path: str) -> tuple[Dict[str, Any], str]: # Changed type hint
         if not self.client or not os.path.exists(file_path): return {}, "Error"
         doc_type = self._identify_document_type(file_path)
         if not doc_type: return {}, "Unknown"
         page = self._find_page_with_cues(file_path, doc_type)
         if not page: return {}, doc_type
         
-        temp_pdf = os.path.join(tempfile.gettempdir(), "_temp_page.pdf") # Use standard temp dir
+        temp_pdf = os.path.join(tempfile.gettempdir(), "_temp_page.pdf")
         try:
             self._create_temp_pdf(file_path, page, temp_pdf)
             context = self._process_file_with_unstructured(temp_pdf)
@@ -176,7 +172,7 @@ class TaxFormParser:
         except Exception as e:
             print(f"ERROR: General PDF processing failed for {file_path}: {e}")
             traceback.print_exc()
-            return {}, "Error" # Return "Error" type for clarity on failure
+            return {}, "Error"
         finally:
             if os.path.exists(temp_pdf):
                 try:

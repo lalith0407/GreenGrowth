@@ -102,6 +102,7 @@ def blocking_file_processor(files: List[UploadFile], openai_api_key: str) -> Lis
                 with open(file_path, "wb") as buffer:
                     shutil.copyfileobj(file.file, buffer)
                 res = parser.process_pdf(file_path)
+                # The type hint for res in silent.py's process_pdf is now `tuple[Dict[str, Any], str]`
                 if isinstance(res, tuple) and len(res) == 2:
                     parsed_dict, doc_type = res
                 else:
@@ -128,7 +129,6 @@ async def process_tax_forms(
         blocking_file_processor,
         files=files,
         openai_api_key=openai_api_key
-        # Removed tesseract_path argument here
     )
 
     try:
