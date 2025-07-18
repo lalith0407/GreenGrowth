@@ -5,8 +5,8 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Step 3: Install system dependencies required for your application
-# This is where we install Tesseract AND the missing graphics library for OpenCV
-RUN apt-get update && apt-get install -y tesseract-ocr libgl1-mesa-glx --no-install-recommends
+# This now includes Tesseract, the graphics library, AND poppler for pdf2image.
+RUN apt-get update && apt-get install -y tesseract-ocr libgl1-mesa-glx poppler-utils --no-install-recommends
 
 # Step 4: Copy the Python requirements file into the container
 COPY requirements.txt .
