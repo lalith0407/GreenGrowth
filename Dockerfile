@@ -1,5 +1,6 @@
 # Use a Python slim base image for smaller size
-FROM python:3.9-slim-bullseye # Or bookworm
+FROM python:3.9-slim-bullseye
+# Removed the comment: # Or bookworm
 
 # Install system dependencies (tesseract-ocr, poppler-utils, and libgl1-mesa-glx)
 # Ensure apt-get update is run before installs
@@ -8,7 +9,7 @@ RUN apt-get update && apt-get install -y \
     libtesseract-dev \
     libleptonica-dev \
     poppler-utils \
-    libgl1-mesa-glx \ # <--- ADD THIS LINE
+    libgl1-mesa-glx \
     && rm -rf /var/lib/apt/lists/*
 
 # Set the TESSERACT_CMD environment variable for pytesseract
